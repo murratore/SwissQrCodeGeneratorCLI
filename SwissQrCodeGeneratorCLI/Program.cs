@@ -29,7 +29,7 @@ internal class Program
         [Option('p',"savepath",Required =true,HelpText ="local path to save file")]
         public string SavePath { get; set; }
 
-        [Option('r',"reference",Required =true,HelpText ="valid reference number")]
+        [Option('r',"reference",Required=false, HelpText ="valid reference number")]
         public string Reference { get; set; }
 
         [Option('m',"message",Required =false, HelpText="message on Invoice")]
@@ -39,7 +39,7 @@ internal class Program
         public string CreditorName { get; set; }
 
         [Option("creditor_address1",Required =false)]
-        public string CreditorAdress1 { get;}
+        public string CreditorAdress1 { get; set; }
 
         [Option("creditor_address2",Required =false)]
         public string CreditorAdress2 { get; set; }
@@ -67,56 +67,74 @@ internal class Program
     .   WithParsed(RunOptions)
         .WithNotParsed(HandleParseError);
     }
+
+    static string GetVersionNumber()
+    {
+        return "V20231221 1349";
+    }
     
 
     static void RunOptions(Options opts)
     {
 
 #pragma warning disable CS8604 // Possible null reference argument.
-        Bill bill = new Bill()
+        Bill bill = new Bill();
+
+
+        bill.Amount = opts.Amount;
+        bill.Account = opts.Iban;
+        bill.Currency = opts.Currency;
+        bill.Creditor = new Address
         {
-            Amount = opts.Amount,
-            Account = opts.Iban,
-            Currency = opts.Currency,
-            Creditor = new Address
+            Name = opts.CreditorName,
+            AddressLine1 = opts.CreditorAdress1,
+            AddressLine2 = opts.CreditorAdress2,
+            CountryCode = opts.CreditorCountryCode
+        };
+
+        if (opts.DebitorName != null && opts.DebitorCountryCode !=null)
+        {
+            bill.Debtor = new Address
             {
-                Name = opts.CreditorName,
-                AddressLine1 = opts.CreditorAdress1,
-                AddressLine2 = opts.CreditorAdress2,
-                CountryCode = opts.CreditorCountryCode
-            },
-            Debtor = new Address
-            {
-                Name= opts.DebitorName,
+                Name = opts.DebitorName,
                 AddressLine1 = opts.DebitorAddress1,
                 AddressLine2 = opts.DebitorAddress2,
                 CountryCode = opts.DebitorCountryCode
 
-            },
+            };
+        }
 
-            // more payment data
-            Reference = opts.Reference,
-            UnstructuredMessage = opts.Message,
-     
+        // more payment data
+        bill.Reference = opts.Reference;
+        
+        bill.UnstructuredMessage = opts.Message;
 
-            Format = new BillFormat
-            {
-                Language = opts.Language,
-                GraphicsFormat = opts.Format,
-                OutputSize =  opts.OutputSizeFormat
 
-            }
+        bill.Format = new BillFormat
+        {
+            Language = opts.Language,
+            GraphicsFormat = opts.Format,
+            OutputSize = opts.OutputSizeFormat
 
         };
+        
 
         ValidationResult validationResult = QRBill.Validate(bill);
+
+        if (validationResult.IsValid == false)
+        {
+            Console.WriteLine($"{GetVersionNumber()} - QR bill data invalid. Error: {validationResult.Description}");
+            return;
+            
+        }
+
 
         // Generate QR bill
         byte[] svg = QRBill.Generate(bill);
 
         // Save generated SVG file        
         File.WriteAllBytes(opts.SavePath, svg);
-        Console.WriteLine($"QR bill saved at {Path.GetFullPath(opts.SavePath)}");
+        Console.WriteLine($"{GetVersionNumber()} - QR bill saved at {Path.GetFullPath(opts.SavePath)}");
 
 
 #pragma warning restore CS8604 // Possible null reference argument.
